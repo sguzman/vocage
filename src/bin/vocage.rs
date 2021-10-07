@@ -57,6 +57,12 @@ fn main() {
                     .index(1)
                     .required(true)
                    )
+                  .arg(Arg::with_name("only")
+                    .long("only")
+                    .short("-o")
+                    .help("study only n entries")
+                    .takes_value(true)
+                  )
                   .args(&VocaSession::common_arguments())
                   .arg(Arg::with_name("minimal")
                     .takes_value(true)
@@ -106,6 +112,13 @@ fn main() {
     let mut seen_only: bool = args.is_present("seen");
     let mut ordered: bool = args.is_present("ordered");
     let mut reset: bool = args.is_present("reset");
+    let only: bool = args.is_present("only");
+    let study_count: u32 = if only {
+        args.value_of("only").unwrap().parse::<u32>().unwrap() + 1
+    } else {
+        u32::MAX
+    };
+
     let minimal: Option<PrintFormat> = match args.value_of("minimal") {
         None => None,
         Some("color") | Some("colour") => Some(PrintFormat::AnsiColour),
@@ -134,7 +147,23 @@ fn main() {
     //make a copy to prevent problems with the borrow checker
     let session = datasets[0].session.clone();
 
+    let mut idx: u32 = 0;
     while !done {
+        idx += 1;
+        if only {
+            if idx >= study_count {
+                done = true;
+                confirmexitstage = false;
+
+                for dataset in datasets.iter() {
+                    dataset.write(reset).expect("failure saving file");
+                }
+
+                println!("Finished studying at {} card", idx);
+                continue;
+            }
+        }
+
         if changed {
             reset = false;
         }
