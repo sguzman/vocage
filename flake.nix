@@ -2,38 +2,38 @@
   description = "Vocage time-staggered learning (like Anki)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    fenix.url = "github:nix-community/fenix";
+    naersk.url = "github:nmattia/naersk";
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
+  outputs = { self, nixpkgs, flake-utils, fenix, naersk }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = [ rust-overlay.overlays.default ];
-        pkgs = import nixpkgs { inherit system overlays; };
-
-        rustToolchain = pkgs.rust-bin.stable."1.85.0".default;
-      in {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "vocage";
-          version = "1.1.0";
-
-          src = ./.;
-
-          nativeBuildInputs = [ rustToolchain ];
-
-          buildPhase = ''
-            cargo build --release --verbose
-          '';
-
-          installPhase = ''
-            mkdir -p $out/bin
-            cp target/release/ $out/bin/
-          '';
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            fenix.overlay
+            (final: prev: {
+              rustToolchain = fenix.packages.${system}.stable.toolchain;
+            })
+          ];
         };
 
-        devShells.default = pkgs.mkShell { buildInputs = [ rustToolchain ]; };
-      });
+        naersk-lib = naersk.lib.${system}.override {
+          cargo = pkgs.rustToolchain;
+          rustc = pkgs.rustToolchain;
+        };
+
+        vocage = naersk-lib.buildPackage {
+          pname = "vocage";
+          version = "1.1.0";
+          src = ./.;
+          # You must run `cargo vendor` first!
+          cargoVendorDir = "vendor";
+        };
+
+      in { packages.default = vocage; });
 }
 
