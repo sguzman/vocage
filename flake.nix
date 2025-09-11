@@ -33,7 +33,7 @@
         src = ./.;
 
         # naersk expects a single hash of the vendored deps tree
-        cargoHash = lib.fakeSha256; # replace after first prefetch
+        cargoHash = "sha256-zHrW8L7/UN4+ckE8PjlL+LEmd5AbXHRUfprar2EzNKk=";
 
         nativeBuildInputs = [pkgs.pkg-config];
         cargoBuildOptions = opts: opts ++ ["--verbose"];
