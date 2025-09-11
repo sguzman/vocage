@@ -1,5 +1,5 @@
 {
-  description = "Vocage: time-staggered learning (like Anki)";
+  description = "Rust package built with naersk";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
@@ -15,42 +15,53 @@
     naersk,
     rust-overlay,
   }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      overlays = [rust-overlay.overlays.default];
-      pkgs = import nixpkgs {inherit system overlays;};
-      lib = pkgs.lib;
+    flake-utils.lib.eachDefaultSystem (
+      system: let
+        overlays = [rust-overlay.overlays.default];
+        pkgs = import nixpkgs {inherit system overlays;};
+        lib = pkgs.lib;
 
-      # Use latest stable available now (swap to ."1.89.0" when the attr exists)
-      rustToolchain = pkgs.rust-bin.stable.latest.default;
+        # Pull name/version straight from Cargo.toml
+        cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+        pname = cargoToml.package.name or "app";
+        version = cargoToml.package.version or "0.0.0";
 
-      naerskLib = pkgs.callPackage naersk {
-        cargo = rustToolchain;
-        rustc = rustToolchain;
-      };
-    in rec {
-      packages.vocage = naerskLib.buildPackage {
-        pname = "vocage";
-        src = ./.;
+        # Toolchain (use exact pin later if you want)
+        rustToolchain = pkgs.rust-bin.stable.latest.default;
 
-        # naersk expects a single hash of the vendored deps tree
-        cargoHash = "sha256-zHrW8L7/UN4+ckE8PjlL+LEmd5AbXHRUfprar2EzNKk=";
+        naersk' = pkgs.callPackage naersk {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
+      in rec {
+        packages.${pname} = naersk'.buildPackage {
+          inherit pname version;
+          src = ./.;
 
-        nativeBuildInputs = [pkgs.pkg-config];
-        cargoBuildOptions = opts: opts ++ ["--verbose"];
-      };
+          # You said: remove --release; add --verbose
+          release = false;
+          cargoBuildOptions = opts: opts ++ ["--verbose"];
 
-      packages.default = packages.vocage;
+          # Enforce lockfile + no network inside sandbox
+          cargoOptions = opts: opts ++ ["--offline" "--locked"];
 
-      apps.default = {
-        type = "app";
-        program = "${packages.vocage}/bin/vocage";
-      };
+          # Add more natives here if needed (openssl, sqlite, zlib, …)
+          nativeBuildInputs = [pkgs.pkg-config];
+        };
 
-      devShells.default = pkgs.mkShell {
-        nativeBuildInputs = [
-          rustToolchain
-          pkgs.pkg-config
-        ];
-      };
-    });
+        packages.default = packages.${pname};
+
+        apps.default = {
+          type = "app";
+          program = "${packages.${pname}}/bin/${pname}";
+        };
+
+        devShells.default = pkgs.mkShell {
+          nativeBuildInputs = [
+            rustToolchain
+            pkgs.pkg-config
+          ];
+        };
+      }
+    );
 }
