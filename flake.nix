@@ -20,8 +20,7 @@
       pkgs = import nixpkgs {inherit system overlays;};
       lib = pkgs.lib;
 
-      # use latest stable toolchain available in the overlay
-      # (swap to pkgs.rust-bin.stable."1.89.0".default when that attr exists)
+      # Use latest stable available now (swap to ."1.89.0" when the attr exists)
       rustToolchain = pkgs.rust-bin.stable.latest.default;
 
       naerskLib = pkgs.callPackage naersk {
@@ -33,19 +32,11 @@
         pname = "vocage";
         src = ./.;
 
-        # make build sandbox-pure/offline
-        cargoLock = {lockFile = ./Cargo.lock;};
-        cargoHash = lib.fakeSha256; # replace with the real hash after first build
+        # naersk expects a single hash of the vendored deps tree
+        cargoHash = lib.fakeSha256; # replace after first prefetch
 
         nativeBuildInputs = [pkgs.pkg-config];
-
-        # your request: remove --release, add --verbose
         cargoBuildOptions = opts: opts ++ ["--verbose"];
-
-        # git deps? uncomment and fill these:
-        # cargoLock.outputHashes = {
-        #   "crate-or-git-src-and-version" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-        # };
       };
 
       packages.default = packages.vocage;
