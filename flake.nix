@@ -2,6 +2,7 @@
   description = "Vocage: time-staggered learning (like Anki)";
 
   inputs = {
+    # Bumped to the 25.05 release channel
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
@@ -19,7 +20,7 @@
       overlays = [rust-overlay.overlays.default];
       pkgs = import nixpkgs {inherit system overlays;};
 
-      # Pin the Rust toolchain like your previous flake
+      # Pinned Rust toolchain
       rustToolchain = pkgs.rust-bin.stable."1.89.0".default;
 
       # Tie naersk to that toolchain
@@ -35,11 +36,10 @@
         # Build release artifacts
         cargoBuildOptions = opts: opts ++ ["--release"];
 
-        # Helpful for crates that use pkg-config (openssl, sqlite, etc.)
+        # Add native deps here if your crates need them (openssl, sqlite, zlib, …)
         nativeBuildInputs = [pkgs.pkg-config];
 
-        # If you have git deps in Cargo.lock, naersk will prompt you once
-        # to add their fixed-output hashes here:
+        # If you have git deps in Cargo.lock, uncomment and fill in hashes:
         # cargoLock = {
         #   lockFile = ./Cargo.lock;
         #   outputHashes = {
