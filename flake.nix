@@ -20,7 +20,8 @@
       pkgs = import nixpkgs {inherit system overlays;};
       lib = pkgs.lib;
 
-      # Pin a toolchain available today (swap to ."1.89.0" once that attr exists)
+      # use latest stable toolchain available in the overlay
+      # (swap to pkgs.rust-bin.stable."1.89.0".default when that attr exists)
       rustToolchain = pkgs.rust-bin.stable.latest.default;
 
       naerskLib = pkgs.callPackage naersk {
@@ -32,21 +33,18 @@
         pname = "vocage";
         src = ./.;
 
-        # Make the build fully offline:
+        # make build sandbox-pure/offline
         cargoLock = {lockFile = ./Cargo.lock;};
+        cargoHash = lib.fakeSha256; # replace with the real hash after first build
 
-        # STEP 1: start with a fake hash; build once to learn the real one,
-        # then replace this value with what Nix prints.
-        cargoHash = lib.fakeSha256;
-
-        # Add native deps here if your crates need them (openssl, sqlite, zlib, …)
         nativeBuildInputs = [pkgs.pkg-config];
 
-        cargoBuildOptions = opts: opts ++ ["--release"];
+        # your request: remove --release, add --verbose
+        cargoBuildOptions = opts: opts ++ ["--verbose"];
 
-        # If you have git dependencies in Cargo.lock, add them here:
+        # git deps? uncomment and fill these:
         # cargoLock.outputHashes = {
-        #   "crate-name-0.1.2" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        #   "crate-or-git-src-and-version" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
         # };
       };
 
