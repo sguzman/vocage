@@ -37,7 +37,7 @@
         src = ./.; # expects Cargo.toml & Cargo.lock here
 
         # Build release artifacts
-        cargoBuildOptions = opts: opts ++ ["--release"];
+        cargoBuildOptions = opts: opts ++ ["--verbose"];
 
         # Add native deps here if your crates need them (openssl, sqlite, zlib, …)
         nativeBuildInputs = [pkgs.pkg-config];
