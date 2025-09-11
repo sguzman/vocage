@@ -2,40 +2,64 @@
   description = "Vocage: time-staggered learning (like Anki)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
+    naersk.url = "github:nix-community/naersk";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ rust-overlay.overlays.default ];
-        pkgs = import nixpkgs { inherit system overlays; };
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    naersk,
+    rust-overlay,
+  }:
+    flake-utils.lib.eachDefaultSystem (system: let
+      overlays = [rust-overlay.overlays.default];
+      pkgs = import nixpkgs {inherit system overlays;};
 
-        rustToolchain = pkgs.rust-bin.stable."1.85.0".default;
-      in {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "vocage";
-          version = "1.1.0";
+      # Pin the Rust toolchain like your previous flake
+      rustToolchain = pkgs.rust-bin.stable."1.89.0".default;
 
-          src = ./.;
+      # Tie naersk to that toolchain
+      naerskLib = pkgs.callPackage naersk {
+        cargo = rustToolchain;
+        rustc = rustToolchain;
+      };
+    in rec {
+      packages.vocage = naerskLib.buildPackage {
+        pname = "vocage";
+        src = ./.; # expects Cargo.toml & Cargo.lock here
 
-          nativeBuildInputs = [ rustToolchain ];
+        # Build release artifacts
+        cargoBuildOptions = opts: opts ++ ["--release"];
 
-          buildPhase = ''
-            cargo build --release --verbose
-          '';
+        # Helpful for crates that use pkg-config (openssl, sqlite, etc.)
+        nativeBuildInputs = [pkgs.pkg-config];
 
-          installPhase = ''
-            mkdir -p $out/bin
-            cp target/release/vocage $out/bin/
-          '';
-        };
+        # If you have git deps in Cargo.lock, naersk will prompt you once
+        # to add their fixed-output hashes here:
+        # cargoLock = {
+        #   lockFile = ./Cargo.lock;
+        #   outputHashes = {
+        #     "some-git-crate-0.1.2" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        #   };
+        # };
+      };
 
-        devShells.default = pkgs.mkShell {
-          buildInputs = [ rustToolchain ];
-        };
-      });
+      packages.default = packages.vocage;
+
+      apps.default = {
+        type = "app";
+        program = "${packages.vocage}/bin/vocage";
+      };
+
+      devShells.default = pkgs.mkShell {
+        nativeBuildInputs = [
+          rustToolchain
+          pkgs.pkg-config
+        ];
+      };
+    });
 }
-
