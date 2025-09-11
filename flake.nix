@@ -2,7 +2,7 @@
   description = "Vocage: time-staggered learning (like Anki)";
 
   inputs = {
-    # Bumped to the 25.05 release channel
+    # 25.05 release channel
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
@@ -20,10 +20,13 @@
       overlays = [rust-overlay.overlays.default];
       pkgs = import nixpkgs {inherit system overlays;};
 
-      # Pinned Rust toolchain
-      rustToolchain = pkgs.rust-bin.stable."1.89.0".default;
+      # NOTE:
+      #  - 1.89.0 isn't present; use latest stable for now.
+      #  - When 1.89.0 becomes available, change this to:
+      #      pkgs.rust-bin.stable."1.89.0".default
+      rustToolchain = pkgs.rust-bin.stable.latest.default;
 
-      # Tie naersk to that toolchain
+      # Wire naersk to that toolchain
       naerskLib = pkgs.callPackage naersk {
         cargo = rustToolchain;
         rustc = rustToolchain;
