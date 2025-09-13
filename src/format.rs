@@ -4,4 +4,3 @@ pub enum PrintFormat {
     Plain,
     AnsiColour,
 }
-

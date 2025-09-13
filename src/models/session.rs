@@ -65,7 +65,12 @@ impl VocaSession {
                         .filter(|s| !s.trim().is_empty())
                         .map(|s| s.trim().parse::<u32>())
                         .collect::<Result<Vec<_>, _>>()
-                        .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("invalid --intervals: {}", e)))?;
+                        .map_err(|e| {
+                            Error::new(
+                                ErrorKind::InvalidInput,
+                                format!("invalid --intervals: {}", e),
+                            )
+                        })?;
                     i += 2;
                 }
                 "--showcolumns" if i + 1 < args.len() => {
@@ -79,7 +84,12 @@ impl VocaSession {
                             .filter(|x| !x.trim().is_empty())
                             .map(|x| x.trim().parse::<u8>())
                             .collect::<Result<Vec<_>, _>>()
-                            .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("invalid --showcolumns: {}", e)))?;
+                            .map_err(|e| {
+                                Error::new(
+                                    ErrorKind::InvalidInput,
+                                    format!("invalid --showcolumns: {}", e),
+                                )
+                            })?;
                         showcolumns.push(cols);
                     }
                     if showcolumns.is_empty() {
@@ -142,4 +152,3 @@ impl VocaSession {
         self.decks.iter().position(|d| d == name).map(|i| i as u8)
     }
 }
-

@@ -1,8 +1,7 @@
-pub mod session;
 pub mod card;
 pub mod data;
+pub mod session;
 
-pub use session::VocaSession;
 pub use card::VocaCard;
 pub use data::VocaData;
-
+pub use session::VocaSession;
