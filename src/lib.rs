@@ -59,15 +59,23 @@ impl VocaSession {
         args.push(
             Arg::with_name("decks")
                 .long("decks")
-                .short("-d")
-                .help("Comma seperated list of deck names")
-                .takes_value(true),
+                // clap v2: &str; clap v3+: char. Use whichever your crate needs:
+                .short("d") // or: .short('d')
+                .help("Deck names (repeat the flag or use a comma-separated list)")
+                .takes_value(true)
+                .multiple(true) // allow repeated flags
+                .use_delimiter(true) // allow comma-separated values
+                .value_delimiter(","),
         );
-        args.push( Arg::with_name("intervals")
-            .long("intervals")
-            .short("-i")
-            .help("Comma seperated list of intervals for each respective deck (in minutes). Must contain as many items as --decks")
-            .takes_value(true)
+        args.push(
+            Arg::with_name("intervals")
+    .long("intervals")
+    .short("i") // or: .short('i')
+    .help("Intervals (minutes) per deck; repeat or comma-separated, same length as --decks")
+    .takes_value(true)
+    .multiple(true)
+    .use_delimiter(true)
+    .value_delimiter(","),
         );
         args.push(
             Arg::with_name("columns")
@@ -91,20 +99,29 @@ impl VocaSession {
     }
 
     pub fn set_common_arguments<'a>(&mut self, args: &clap::ArgMatches<'a>) -> Result<(), Error> {
-        if let Some(decks) = args.value_of("decks") {
-            self.decks = decks
-                .trim()
-                .split(",")
-                .map(|s| s.trim().to_owned())
+        if let Some(vals) = args.values_of("decks") {
+            self.decks = vals
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(ToOwned::to_owned)
                 .collect();
         }
-        if let Some(intervals) = args.value_of("intervals") {
-            self.intervals = intervals
-                .trim()
-                .split(",")
-                .map(|s| s.parse::<u32>().expect("parsing interval"))
+
+        if let Some(vals) = args.values_of("intervals") {
+            let parsed: Result<Vec<u32>, _> = vals
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.parse::<u32>())
                 .collect();
+
+            self.intervals = parsed.map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("invalid --intervals value: {}", e),
+                )
+            })?;
         }
+
         if let Some(columns) = args.value_of("columns") {
             self.columns = columns
                 .trim()
