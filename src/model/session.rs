@@ -1,5 +1,8 @@
 use std::io::{Error, ErrorKind};
 
+// add clap v2
+use clap::{Arg, ArgMatches};
+
 /// Session-wide configuration/state
 #[derive(Clone, Debug)]
 pub struct VocaSession {
@@ -19,18 +22,8 @@ pub struct VocaSession {
 }
 
 impl VocaSession {
-    /// Construct from "arguments" (stringy flags).
-    ///
-    /// This is a **minimal, dependency-free** parser that recognizes a small set of flags:
-    /// - `--columns A,B,C`
-    /// - `--decks immediate,daily,weekly`
-    /// - `--intervals 10,1440,2880`
-    /// - `--showcolumns 0|1,2`   (side 0 shows [0]; side 1 shows [1,2])
-    /// - `--listdelimiter ;`
-    /// - `--header` / `--no-header`
-    /// - `--returntofirst` / `--no-returntofirst`
-    ///
-    /// If you prefer `clap`, swap this body for your original parser; the signature stays the same.
+    /// Construct from "arguments" (stringy flags) without clap.
+    /// You can keep using this for programmatic calls or tests.
     pub fn from_arguments(args: Vec<&str>) -> Result<Self, Error> {
         let mut columns: Vec<String> = Vec::new();
         let mut decks: Vec<String> = Vec::new();
@@ -44,57 +37,19 @@ impl VocaSession {
         while i < args.len() {
             match args[i] {
                 "--columns" if i + 1 < args.len() => {
-                    columns = args[i + 1]
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
+                    columns = parse_csv_strings(args[i + 1]);
                     i += 2;
                 }
                 "--decks" if i + 1 < args.len() => {
-                    decks = args[i + 1]
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
+                    decks = parse_csv_strings(args[i + 1]);
                     i += 2;
                 }
                 "--intervals" if i + 1 < args.len() => {
-                    intervals = args[i + 1]
-                        .split(',')
-                        .filter(|s| !s.trim().is_empty())
-                        .map(|s| s.trim().parse::<u32>())
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(|e| {
-                            Error::new(
-                                ErrorKind::InvalidInput,
-                                format!("invalid --intervals: {}", e),
-                            )
-                        })?;
+                    intervals = parse_csv_u32(args[i + 1])?;
                     i += 2;
                 }
                 "--showcolumns" if i + 1 < args.len() => {
-                    // Format: "0|1,2" => side0:[0], side1:[1,2]
-                    let s = args[i + 1];
-                    let parts: Vec<&str> = s.split('|').collect();
-                    showcolumns.clear();
-                    for side in parts {
-                        let cols: Vec<u8> = side
-                            .split(',')
-                            .filter(|x| !x.trim().is_empty())
-                            .map(|x| x.trim().parse::<u8>())
-                            .collect::<Result<Vec<_>, _>>()
-                            .map_err(|e| {
-                                Error::new(
-                                    ErrorKind::InvalidInput,
-                                    format!("invalid --showcolumns: {}", e),
-                                )
-                            })?;
-                        showcolumns.push(cols);
-                    }
-                    if showcolumns.is_empty() {
-                        showcolumns = vec![vec![0], vec![1]];
-                    }
+                    showcolumns = parse_showcolumns(args[i + 1])?;
                     i += 2;
                 }
                 "--listdelimiter" if i + 1 < args.len() => {
@@ -118,7 +73,7 @@ impl VocaSession {
                     i += 1;
                 }
                 _ => {
-                    // ignore unknown switches; keep parity with "best-effort" behavior
+                    // ignore unknown switches
                     i += 1;
                 }
             }
@@ -150,5 +105,153 @@ impl VocaSession {
     /// Return deck index by name, if present.
     pub fn get_deck_by_name(&self, name: &str) -> Option<u8> {
         self.decks.iter().position(|d| d == name).map(|i| i as u8)
+    }
+
+    // ===== clap v2 interop expected by src/bin/vocage.rs =====
+
+    /// Arguments that the binary attaches to its `App`.
+    /// (clap v2 types)
+    pub fn common_arguments() -> Vec<Arg<'static, 'static>> {
+        vec![
+            Arg::with_name("columns")
+                .long("columns")
+                .value_name("COL1,COL2,...")
+                .takes_value(true)
+                .help("Comma-separated column names (header row overrides if present)"),
+            Arg::with_name("decks")
+                .long("decks")
+                .value_name("D1,D2,...")
+                .takes_value(true)
+                .help("Comma-separated deck names, e.g. immediate,daily,weekly"),
+            Arg::with_name("intervals")
+                .long("intervals")
+                .value_name("MINS,...")
+                .takes_value(true)
+                .help("Comma-separated deck intervals in minutes; must match --decks length"),
+            Arg::with_name("showcolumns")
+                .long("showcolumns")
+                .value_name("SPEC")
+                .takes_value(true)
+                .help(r#"Column spec per side, e.g. "0|1,2" (side0 shows [0]; side1 shows [1,2])"#),
+            Arg::with_name("listdelimiter")
+                .long("listdelimiter")
+                .value_name("STR")
+                .takes_value(true)
+                .help("If set, fields containing this delimiter are printed as multiple lines"),
+            Arg::with_name("header")
+                .long("header")
+                .help("Input has a header row with column names")
+                .takes_value(false),
+            Arg::with_name("no-header")
+                .long("no-header")
+                .help("Input has no header row")
+                .takes_value(false),
+            Arg::with_name("returntofirst")
+                .long("returntofirst")
+                .help("Demotion returns a card to the first deck")
+                .takes_value(false),
+            Arg::with_name("no-returntofirst")
+                .long("no-returntofirst")
+                .help("Demotion only steps down one deck")
+                .takes_value(false),
+        ]
+    }
+
+    /// Apply parsed matches to this session (keeps unspecified values as-is).
+    pub fn set_common_arguments(&mut self, m: &ArgMatches) -> Result<(), Error> {
+        if let Some(s) = m.value_of("columns") {
+            self.columns = parse_csv_strings(s);
+        }
+        if let Some(s) = m.value_of("decks") {
+            self.decks = parse_csv_strings(s);
+        }
+        if let Some(s) = m.value_of("intervals") {
+            self.intervals = parse_csv_u32(s)?;
+        }
+        if let Some(s) = m.value_of("showcolumns") {
+            self.showcolumns = parse_showcolumns(s)?;
+        }
+        if let Some(s) = m.value_of("listdelimiter") {
+            self.listdelimiter = Some(s.to_string());
+        }
+
+        // booleans via paired flags
+        if m.is_present("no-header") {
+            self.header = false;
+        } else if m.is_present("header") {
+            self.header = true;
+        }
+
+        if m.is_present("no-returntofirst") {
+            self.returntofirst = false;
+        } else if m.is_present("returntofirst") {
+            self.returntofirst = true;
+        }
+
+        if !self.intervals.is_empty()
+            && !self.decks.is_empty()
+            && self.intervals.len() != self.decks.len()
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "intervals length ({}) must match decks length ({})",
+                    self.intervals.len(),
+                    self.decks.len()
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+// ---------- helpers ----------
+
+fn parse_csv_strings(s: &str) -> Vec<String> {
+    s.split(',')
+        .map(|x| x.trim().to_string())
+        .filter(|x| !x.is_empty())
+        .collect()
+}
+
+fn parse_csv_u32(s: &str) -> Result<Vec<u32>, Error> {
+    s.split(',')
+        .map(|x| x.trim())
+        .filter(|x| !x.is_empty())
+        .map(|x| {
+            x.parse::<u32>().map_err(|e| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("invalid integer '{}': {}", x, e),
+                )
+            })
+        })
+        .collect()
+}
+
+fn parse_showcolumns(s: &str) -> Result<Vec<Vec<u8>>, Error> {
+    // "0|1,2" => vec![vec![0], vec![1,2]]
+    let mut out: Vec<Vec<u8>> = Vec::new();
+    for side in s.split('|') {
+        let vecu8: Vec<u8> = side
+            .split(',')
+            .map(|x| x.trim())
+            .filter(|x| !x.is_empty())
+            .map(|x| {
+                x.parse::<u8>().map_err(|e| {
+                    Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("invalid column '{}': {}", x, e),
+                    )
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        out.push(vecu8);
+    }
+    if out.is_empty() {
+        Ok(vec![vec![0], vec![1]])
+    } else {
+        Ok(out)
     }
 }
