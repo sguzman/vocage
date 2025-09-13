@@ -1,10 +1,8 @@
 use crate::model::card::VocaCard;
 use crate::model::session::VocaSession;
-use chrono::NaiveDateTime;
 use rand::prelude::Rng;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
-use std::path::Path;
 
 /// A dataset = session config + cards + preserved comment lines
 #[derive(Clone, Debug)]
@@ -109,7 +107,8 @@ impl VocaData {
         if filtered.is_empty() {
             None
         } else {
-            let pick = rng.gen_range(0..filtered.len());
+            // rand 0.7 signature: gen_range(low, high)
+            let pick = rng.gen_range(0, filtered.len());
             Some((filtered[pick], filtered.len()))
         }
     }
