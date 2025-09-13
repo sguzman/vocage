@@ -178,7 +178,7 @@ impl VocaCard {
             let now = *now.unwrap_or(&Utc::now().naive_utc());
             match self.due {
                 Some(due) => due <= now,
-                None => false,
+                None => true,
             }
         } else {
             true
